@@ -59,7 +59,21 @@ HF_AVAILABLE_VOICES: list[str] = [
     "Vivian",
 ]
 
+# Voices supported by the Gemini Live API.
+GEMINI_AVAILABLE_VOICES: list[str] = [
+    "Aoede",
+    "Charon",
+    "Fenrir",
+    "Kore",
+    "Leda",
+    "Orus",
+    "Puck",
+    "Zephyr",
+]
+
 HF_BACKEND = "huggingface"
+GEMINI_BACKEND = "gemini"
+DEFAULT_BACKEND_PROVIDER = HF_BACKEND
 HF_REALTIME_CONNECTION_MODE_ENV = "HF_REALTIME_CONNECTION_MODE"
 HF_REALTIME_WS_URL_ENV = "HF_REALTIME_WS_URL"
 REALTIME_TRANSCRIPTION_LANGUAGE_ENV = "REALTIME_TRANSCRIPTION_LANGUAGE"
@@ -84,20 +98,52 @@ class HFBackendDefaults:
 
 HF_DEFAULTS = HFBackendDefaults()
 
+# Two selectable backends: Hugging Face (default) and Gemini Live (opt-in via
+# BACKEND_PROVIDER=gemini or a gemini-* MODEL_NAME). OpenAI is intentionally not
+# restored in this fork.
+DEFAULT_MODEL_NAME_BY_BACKEND = {
+    GEMINI_BACKEND: "gemini-3.1-flash-live-preview",
+    HF_BACKEND: "",
+}
+DEFAULT_VOICE_BY_BACKEND = {
+    GEMINI_BACKEND: "Kore",
+    HF_BACKEND: HF_DEFAULTS.voice,
+}
+
 logger = logging.getLogger(__name__)
 
-# Removed backend selectors kept in stale robot .env files: warn but ignore them.
-_OBSOLETE_BACKEND_ENV_NAMES = ("BACKEND_PROVIDER", "MODEL_NAME")
+
+def _is_gemini_model_name(model_name: str | None) -> bool:
+    """Return True when the provided model name targets Gemini."""
+    return (model_name or "").strip().lower().startswith("gemini")
 
 
-def _warn_on_obsolete_backend_env() -> None:
-    """Warn when removed multi-backend selectors are still set; Hugging Face is the only backend."""
-    present = [name for name in _OBSOLETE_BACKEND_ENV_NAMES if (os.getenv(name) or "").strip()]
-    if present:
-        logger.warning(
-            "Ignoring obsolete backend environment variable(s): %s. This app now uses the Hugging Face backend only.",
-            ", ".join(present),
-        )
+def _normalize_backend_provider(
+    backend_provider: str | None = None,
+    model_name: str | None = None,
+) -> str:
+    """Normalize the configured backend provider to 'huggingface' or 'gemini'."""
+    candidate = (backend_provider or "").strip().lower()
+    if candidate in DEFAULT_MODEL_NAME_BY_BACKEND:
+        return candidate
+    if candidate:
+        expected = ", ".join(sorted(DEFAULT_MODEL_NAME_BY_BACKEND))
+        raise ValueError(f"Invalid BACKEND_PROVIDER={backend_provider!r}. Expected one of: {expected}.")
+    return GEMINI_BACKEND if _is_gemini_model_name(model_name) else DEFAULT_BACKEND_PROVIDER
+
+
+def _resolve_model_name(
+    backend_provider: str | None = None,
+    model_name: str | None = None,
+) -> str:
+    """Return a model name that matches the selected backend provider."""
+    normalized_backend = _normalize_backend_provider(backend_provider, model_name)
+    if normalized_backend == HF_BACKEND:
+        return DEFAULT_MODEL_NAME_BY_BACKEND[HF_BACKEND]
+    candidate = (model_name or "").strip()
+    if candidate and _is_gemini_model_name(candidate):
+        return candidate
+    return DEFAULT_MODEL_NAME_BY_BACKEND[normalized_backend]
 
 
 def _env_flag(name: str, default: bool = False) -> bool:
@@ -291,11 +337,18 @@ else:
     else:
         logger.warning("No .env file found, using environment variables")
 
-_warn_on_obsolete_backend_env()
-
 
 class Config:
     """Configuration class for the conversation app."""
+
+    # Backend selection: Hugging Face (default) or Gemini Live (BACKEND_PROVIDER=gemini
+    # or a gemini-* MODEL_NAME). GEMINI_API_KEY (or GOOGLE_API_KEY) is required for Gemini.
+    BACKEND_PROVIDER = _normalize_backend_provider(
+        os.getenv("BACKEND_PROVIDER"),
+        os.getenv("MODEL_NAME"),
+    )
+    MODEL_NAME = _resolve_model_name(BACKEND_PROVIDER, os.getenv("MODEL_NAME"))
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 
     HF_REALTIME_CONNECTION_MODE = (
         _normalize_hf_connection_mode(os.getenv(HF_REALTIME_CONNECTION_MODE_ENV)) or HF_DEFAULTS.connection_mode
@@ -307,7 +360,9 @@ class Config:
     HF_TOKEN = os.getenv("HF_TOKEN")  # Optional, falls back to hf auth login if not set
 
     logger.debug(
-        "HF mode: %s, HF session URL set: %s, HF direct URL set: %s",
+        "Backend: %s, Model: %s, HF mode: %s, HF session URL set: %s, HF direct URL set: %s",
+        BACKEND_PROVIDER,
+        MODEL_NAME,
         HF_REALTIME_CONNECTION_MODE,
         bool(HF_REALTIME_SESSION_URL and HF_REALTIME_SESSION_URL.strip()),
         bool(HF_REALTIME_WS_URL and HF_REALTIME_WS_URL.strip()),
@@ -401,7 +456,12 @@ config = Config()
 
 def refresh_runtime_config_from_env() -> None:
     """Refresh mutable runtime config fields from the current environment."""
-    _warn_on_obsolete_backend_env()
+    config.BACKEND_PROVIDER = _normalize_backend_provider(
+        os.getenv("BACKEND_PROVIDER"),
+        os.getenv("MODEL_NAME"),
+    )
+    config.MODEL_NAME = _resolve_model_name(config.BACKEND_PROVIDER, os.getenv("MODEL_NAME"))
+    config.GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
     config.HF_REALTIME_CONNECTION_MODE = (
         _normalize_hf_connection_mode(os.getenv(HF_REALTIME_CONNECTION_MODE_ENV)) or HF_DEFAULTS.connection_mode
     )
@@ -415,13 +475,22 @@ def refresh_runtime_config_from_env() -> None:
     config.REACHY_MINI_CUSTOM_PROFILE = LOCKED_PROFILE or os.getenv("REACHY_MINI_CUSTOM_PROFILE")
 
 
+def is_gemini_model() -> bool:
+    """Return True when the configured backend is Gemini Live."""
+    return _normalize_backend_provider(config.BACKEND_PROVIDER, config.MODEL_NAME) == GEMINI_BACKEND
+
+
 def get_available_voices() -> list[str]:
-    """Return the curated Hugging Face voice list."""
+    """Return the curated voice list for the active backend."""
+    if is_gemini_model():
+        return list(GEMINI_AVAILABLE_VOICES)
     return list(HF_AVAILABLE_VOICES)
 
 
 def get_default_voice() -> str:
-    """Return the default Hugging Face voice."""
+    """Return the default voice for the active backend."""
+    if is_gemini_model():
+        return DEFAULT_VOICE_BY_BACKEND[GEMINI_BACKEND]
     return HF_DEFAULTS.voice
 
 

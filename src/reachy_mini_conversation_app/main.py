@@ -88,6 +88,8 @@ def run(
     from reachy_mini_conversation_app.moves import MovementManager
     from reachy_mini_conversation_app.config import (
         HF_LOCAL_CONNECTION_MODE,
+        config,
+        is_gemini_model,
         set_instance_path,
         get_hf_connection_selection,
         resolve_app_timeout_minutes,
@@ -165,7 +167,17 @@ def run(
     )
 
     def build_handler(startup_voice: Optional[str] = None) -> ConversationHandler:
-        """Build a Hugging Face realtime handler for the current runtime config."""
+        """Build a realtime handler for the current runtime backend config."""
+        if is_gemini_model():
+            from reachy_mini_conversation_app.gemini_live import GeminiLiveHandler
+
+            logger.info("Using Gemini Live handler (model=%s)", config.MODEL_NAME)
+            return GeminiLiveHandler(
+                deps,
+                instance_path=instance_path,
+                startup_voice=startup_voice,
+            )
+
         from reachy_mini_conversation_app.huggingface_realtime import HuggingFaceRealtimeHandler
 
         hf_connection_selection = get_hf_connection_selection()
