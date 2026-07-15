@@ -5,11 +5,8 @@ on:
       - "src/**"
       - "tests/**"
       - "pyproject.toml"
+  # No path filter: required status check, must run on every PR (see pytest.yml).
   pull_request:
-    paths:
-      - "src/**"
-      - "tests/**"
-      - "pyproject.toml"
   workflow_dispatch:
 
 concurrency:
