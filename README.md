@@ -170,6 +170,7 @@ The app runs in console mode by default. Add `--ui` to also serve a web UI at ht
 | Option | Default | Description |
 |--------|---------|-------------|
 | `--no-camera` | `False` | Run without camera capture. |
+| `--camera-stream` | `False` | Continuously stream camera frames (~1 FPS) to the model for ongoing visual context. Gemini Live backend only, and **metered** — off by default. The on-demand `camera` tool works regardless. |
 | `--ui` | `False` | Serve the web UI at http://127.0.0.1:7860/, in addition to console mode. |
 | `--robot-name` | `None` | Optional. Connect to a specific robot by name when running multiple daemons on the same subnet. See [Multiple robots on the same subnet](#advanced-features). |
 | `--debug` | `False` | Enable verbose logging for troubleshooting. |
@@ -182,6 +183,9 @@ reachy-mini-conversation-app --no-camera
 
 # Launch with the minimal web UI for personality/mic/settings control
 reachy-mini-conversation-app --ui
+
+# Gemini Live with continuous camera streaming for ongoing visual context (metered)
+BACKEND_PROVIDER=gemini GEMINI_API_KEY=... reachy-mini-conversation-app --camera-stream
 ```
 
 ## LLM tools exposed to the assistant
