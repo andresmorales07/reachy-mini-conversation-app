@@ -21,6 +21,10 @@ dependencies = [
     #OpenAI (used by the Hugging Face backend)
     "openai==2.28.0",
 
+    #Gemini Live backend (google-genai = Live SDK; scipy = signal.resample for 16 kHz input)
+    "google-genai>=1.0.0",
+    "scipy",
+
     #Reachy mini
     "reachy_mini_dances_library",
     "reachy_mini_toolbox",

@@ -1,10 +1,8 @@
 name: uv.lock check
 
 on:
+  # No path filter: required status check, must run on every PR (see pytest.yml).
   pull_request:
-    paths:
-      - "pyproject.toml"
-      - "uv.lock"
 
 jobs:
   uv-lock-check:

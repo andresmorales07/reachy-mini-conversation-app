@@ -16,6 +16,9 @@ tags:
 
 Conversational app for the Reachy Mini robot combining realtime voice backends and choreographed motion libraries.
 
+> [!NOTE]
+> **This is a fork** of [`pollen-robotics/reachy_mini_conversation_app`](https://github.com/pollen-robotics/reachy_mini_conversation_app), based on tag **v0.9.0**, that **restores the Gemini Live backend** (native-audio voice + native camera vision) upstream removed in [#444](https://github.com/pollen-robotics/reachy_mini_conversation_app/pull/444). Hugging Face stays the default backend; select Gemini with `BACKEND_PROVIDER=gemini` (or a `gemini-*` `MODEL_NAME`) plus a `GEMINI_API_KEY`. To keep the fork current with upstream, see [Development setup](#development-setup).
+
 ![Reachy Mini Dance](docs/assets/reachy_mini_dance.gif)
 
 ## Table of contents
@@ -167,6 +170,7 @@ The app runs in console mode by default. Add `--ui` to also serve a web UI at ht
 | Option | Default | Description |
 |--------|---------|-------------|
 | `--no-camera` | `False` | Run without camera capture. |
+| `--camera-stream` | `False` | Continuously stream camera frames (~1 FPS) to the model for ongoing visual context. Gemini Live backend only, and **metered** — off by default. The on-demand `camera` tool works regardless. |
 | `--ui` | `False` | Serve the web UI at http://127.0.0.1:7860/, in addition to console mode. |
 | `--robot-name` | `None` | Optional. Connect to a specific robot by name when running multiple daemons on the same subnet. See [Multiple robots on the same subnet](#advanced-features). |
 | `--debug` | `False` | Enable verbose logging for troubleshooting. |
@@ -179,6 +183,9 @@ reachy-mini-conversation-app --no-camera
 
 # Launch with the minimal web UI for personality/mic/settings control
 reachy-mini-conversation-app --ui
+
+# Gemini Live with continuous camera streaming for ongoing visual context (metered)
+BACKEND_PROVIDER=gemini GEMINI_API_KEY=... reachy-mini-conversation-app --camera-stream
 ```
 
 ## LLM tools exposed to the assistant
@@ -372,6 +379,24 @@ Quick start:
 - Fork and clone the repo
 - Follow the [installation steps](#installation) (include the `dev` dependency group)
 - Run contributor checks listed in [CONTRIBUTING.md](CONTRIBUTING.md)
+
+### Development setup
+
+This is a **detached fork**, not a GitHub fork, so the link to the original repo lives only in your local git config — it is **not** stored on GitHub and does **not** come with a `git clone`. A fresh clone has a single remote, `origin`, pointing at this fork. To pull changes from the original project, add the `upstream` remote once per machine:
+
+```bash
+git remote add upstream https://github.com/pollen-robotics/reachy_mini_conversation_app.git
+git fetch upstream --tags
+```
+
+Then rebase the fork onto a newer upstream release when you want to update:
+
+```bash
+git fetch upstream
+git rebase upstream/main        # or a specific tag, e.g. v0.10.0
+```
+
+The Gemini restore is small and isolated (one handler plus a two-backend selector in `config.py`), so these rebases stay cheap.
 
 ## License
 

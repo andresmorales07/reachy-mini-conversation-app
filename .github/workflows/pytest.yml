@@ -8,13 +8,10 @@ on:
       - ".github/workflows/**"
       - "pyproject.toml"
       - "uv.lock"
+  # No path filter: this is a required status check, so it must run on every PR.
+  # A path-filtered required check never reports on unrelated PRs (e.g. docs-only)
+  # and leaves them stuck "Expected — waiting for status".
   pull_request:
-    paths:
-      - "src/**"
-      - "tests/**"
-      - ".github/workflows/**"
-      - "pyproject.toml"
-      - "uv.lock"
 
 permissions:
   contents: read

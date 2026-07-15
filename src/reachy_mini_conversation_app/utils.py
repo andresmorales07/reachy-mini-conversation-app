@@ -10,6 +10,13 @@ def parse_args() -> tuple[argparse.Namespace, list]:  # type: ignore
     parser = argparse.ArgumentParser("Reachy Mini Conversation App")
     parser.add_argument("--no-camera", default=False, action="store_true", help="Disable camera usage")
     parser.add_argument(
+        "--camera-stream",
+        default=False,
+        action="store_true",
+        help="Continuously stream camera frames (~1 FPS) to the model for ongoing visual context "
+        "(Gemini Live only, metered). Off by default; the on-demand `camera` tool still works.",
+    )
+    parser.add_argument(
         "--ui",
         default=False,
         action="store_true",

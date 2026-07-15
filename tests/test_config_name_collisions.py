@@ -61,19 +61,55 @@ def test_config_raises_when_selected_external_profile_is_missing(
         config_mod.Config()
 
 
-def test_obsolete_backend_env_is_ignored_with_warning(
-    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
-) -> None:
-    """Stale multi-backend selectors should be ignored with a warning, not change behaviour."""
-    monkeypatch.setenv("BACKEND_PROVIDER", "openai")
-    monkeypatch.setenv("MODEL_NAME", "gpt-realtime-2")
-
-    with caplog.at_level("WARNING"):
+def test_backend_provider_selects_gemini(monkeypatch: pytest.MonkeyPatch) -> None:
+    """BACKEND_PROVIDER=gemini is honored and resolves the Gemini defaults/voices."""
+    monkeypatch.setenv("BACKEND_PROVIDER", "gemini")
+    monkeypatch.delenv("MODEL_NAME", raising=False)
+    try:
         config_mod.refresh_runtime_config_from_env()
 
-    assert "BACKEND_PROVIDER" in caplog.text
-    assert "MODEL_NAME" in caplog.text
-    assert "Hugging Face backend only" in caplog.text
+        assert config_mod.config.BACKEND_PROVIDER == config_mod.GEMINI_BACKEND
+        assert config_mod.config.MODEL_NAME == "gemini-3.1-flash-live-preview"
+        assert config_mod.is_gemini_model() is True
+        assert config_mod.get_default_voice() == "Kore"
+        assert config_mod.get_available_voices() == list(config_mod.GEMINI_AVAILABLE_VOICES)
+    finally:
+        # Restore process-wide runtime config for other tests.
+        monkeypatch.delenv("BACKEND_PROVIDER", raising=False)
+        config_mod.refresh_runtime_config_from_env()
+
+
+def test_removed_backend_provider_falls_back_to_huggingface(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A removed-but-formerly-valid provider (openai) warns and falls back, not crashes.
+
+    Guards against a stale robot .env carrying BACKEND_PROVIDER=openai (valid in
+    v0.5-v0.8) hard-crashing the app at import.
+    """
+    monkeypatch.setenv("BACKEND_PROVIDER", "openai")
+    monkeypatch.delenv("MODEL_NAME", raising=False)
+    try:
+        with caplog.at_level("WARNING"):
+            config_mod.refresh_runtime_config_from_env()
+
+        assert config_mod.config.BACKEND_PROVIDER == config_mod.HF_BACKEND
+        assert config_mod.is_gemini_model() is False
+        assert "openai" in caplog.text.lower()
+    finally:
+        monkeypatch.delenv("BACKEND_PROVIDER", raising=False)
+        config_mod.refresh_runtime_config_from_env()
+
+
+def test_unknown_backend_provider_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An unrecognized BACKEND_PROVIDER (e.g. a typo) is rejected rather than silently ignored."""
+    monkeypatch.setenv("BACKEND_PROVIDER", "huggingfacee")
+    try:
+        with pytest.raises(ValueError, match="Invalid BACKEND_PROVIDER"):
+            config_mod.refresh_runtime_config_from_env()
+    finally:
+        monkeypatch.delenv("BACKEND_PROVIDER", raising=False)
+        config_mod.refresh_runtime_config_from_env()
 
 
 def test_hf_default_session_url_uses_stable_space_proxy() -> None:

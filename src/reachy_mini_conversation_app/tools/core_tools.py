@@ -42,6 +42,9 @@ class ToolDependencies:
     # Optional deps
     instance_path: str | Path | None = None
     camera_enabled: bool = False
+    # Continuous ~1 FPS camera streaming to the model (Gemini Live only). Off by
+    # default because it is metered; the on-demand `camera` tool covers most needs.
+    camera_stream_enabled: bool = False
     motion_duration_s: float = 1.0
     go_to_sleep: Callable[[], dict[str, Any]] | None = None
 
