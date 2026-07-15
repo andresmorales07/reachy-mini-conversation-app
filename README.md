@@ -16,6 +16,9 @@ tags:
 
 Conversational app for the Reachy Mini robot combining realtime voice backends and choreographed motion libraries.
 
+> [!NOTE]
+> **This is a fork** of [`pollen-robotics/reachy_mini_conversation_app`](https://github.com/pollen-robotics/reachy_mini_conversation_app), based on tag **v0.9.0**, that **restores the Gemini Live backend** (native-audio voice + native camera vision) upstream removed in [#444](https://github.com/pollen-robotics/reachy_mini_conversation_app/pull/444). Hugging Face stays the default backend; select Gemini with `BACKEND_PROVIDER=gemini` (or a `gemini-*` `MODEL_NAME`) plus a `GEMINI_API_KEY`. To keep the fork current with upstream, see [Development setup](#development-setup).
+
 ![Reachy Mini Dance](docs/assets/reachy_mini_dance.gif)
 
 ## Table of contents
@@ -372,6 +375,24 @@ Quick start:
 - Fork and clone the repo
 - Follow the [installation steps](#installation) (include the `dev` dependency group)
 - Run contributor checks listed in [CONTRIBUTING.md](CONTRIBUTING.md)
+
+### Development setup
+
+This is a **detached fork**, not a GitHub fork, so the link to the original repo lives only in your local git config — it is **not** stored on GitHub and does **not** come with a `git clone`. A fresh clone has a single remote, `origin`, pointing at this fork. To pull changes from the original project, add the `upstream` remote once per machine:
+
+```bash
+git remote add upstream https://github.com/pollen-robotics/reachy_mini_conversation_app.git
+git fetch upstream --tags
+```
+
+Then rebase the fork onto a newer upstream release when you want to update:
+
+```bash
+git fetch upstream
+git rebase upstream/main        # or a specific tag, e.g. v0.10.0
+```
+
+The Gemini restore is small and isolated (one handler plus a two-backend selector in `config.py`), so these rebases stay cheap.
 
 ## License
 
