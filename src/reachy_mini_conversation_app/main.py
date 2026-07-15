@@ -122,10 +122,13 @@ def run(
         except Exception as e:
             logger.warning("Failed to load startup settings: %s", e)
 
-    logger.info(
-        "Configured Hugging Face realtime backend, connection mode: %s",
-        get_hf_connection_selection().mode,
-    )
+    if is_gemini_model():
+        logger.info("Configured Gemini Live backend (model: %s)", config.MODEL_NAME)
+    else:
+        logger.info(
+            "Configured Hugging Face realtime backend, connection mode: %s",
+            get_hf_connection_selection().mode,
+        )
 
     from reachy_mini_conversation_app.console import LocalStream
     from reachy_mini_conversation_app.tools.core_tools import ToolDependencies, initialize_tools
@@ -164,6 +167,7 @@ def run(
         movement_manager=movement_manager,
         instance_path=instance_path,
         camera_enabled=not args.no_camera,
+        camera_stream_enabled=args.camera_stream and not args.no_camera,
     )
 
     def build_handler(startup_voice: Optional[str] = None) -> ConversationHandler:

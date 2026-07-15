@@ -531,13 +531,13 @@ class GeminiLiveHandler(ConversationHandler):
     async def _video_sender_loop(self) -> None:
         """Send camera frames to Gemini Live at ~1 FPS for continuous visual context.
 
-        Only runs when the camera is enabled. Frames are JPEG-encoded
-        and sent via send_realtime_input(video=...).
+        Only runs when continuous camera streaming is enabled (--camera-stream).
+        Frames are JPEG-encoded and sent via send_realtime_input(video=...).
         """
         logger.info("Video sender loop started (1 FPS)")
         while not self._stop_event.is_set():
             try:
-                if self.session and self.deps.camera_enabled:
+                if self.session and self.deps.camera_stream_enabled:
                     frame = self.deps.reachy_mini.media.get_frame()
                     if frame is not None:
                         jpeg_bytes = encode_bgr_frame_as_jpeg(frame)
@@ -574,8 +574,8 @@ class GeminiLiveHandler(ConversationHandler):
                 # Start the background tool manager
                 self.tool_manager.start_up(tool_callbacks=[self._handle_tool_result])
 
-                # Start video sender if camera is available
-                if self.deps.camera_enabled:
+                # Start continuous video sender only when explicitly opted in (metered)
+                if self.deps.camera_stream_enabled:
                     video_task = asyncio.create_task(self._video_sender_loop(), name="gemini-video-sender")
 
                 await self._send_startup_greeting_prompt()

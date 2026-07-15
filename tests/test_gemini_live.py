@@ -289,6 +289,55 @@ async def test_gemini_camera_tool_sends_snapshot_and_returns_json_result() -> No
 
 
 @pytest.mark.asyncio
+async def test_video_stream_off_by_default_even_with_camera_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The metered continuous video stream stays off unless camera_stream_enabled is set."""
+    deps = ToolDependencies(
+        reachy_mini=MagicMock(),
+        movement_manager=MagicMock(),
+        camera_enabled=True,  # on-demand camera tool on...
+        camera_stream_enabled=False,  # ...but continuous streaming off (default)
+    )
+    handler = GeminiLiveHandler(deps)
+    handler.session = _FakeSession([], handler._stop_event)
+
+    async def _stop_after_tick(_seconds: float) -> None:
+        handler._stop_event.set()
+
+    monkeypatch.setattr(gemini_mod.asyncio, "sleep", _stop_after_tick)
+    await handler._video_sender_loop()
+
+    deps.reachy_mini.media.get_frame.assert_not_called()
+    assert handler.session.realtime_inputs == []
+
+
+@pytest.mark.asyncio
+async def test_video_stream_sends_frames_when_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    """With camera_stream_enabled, frames are JPEG-encoded and pushed via realtime video input."""
+    deps = ToolDependencies(
+        reachy_mini=MagicMock(),
+        movement_manager=MagicMock(),
+        camera_enabled=True,
+        camera_stream_enabled=True,
+    )
+    deps.reachy_mini.media.get_frame.return_value = object()  # non-None frame
+    handler = GeminiLiveHandler(deps)
+    handler.session = _FakeSession([], handler._stop_event)
+
+    monkeypatch.setattr(gemini_mod, "encode_bgr_frame_as_jpeg", lambda _frame: b"jpeg-bytes")
+
+    async def _stop_after_tick(_seconds: float) -> None:
+        handler._stop_event.set()
+
+    monkeypatch.setattr(gemini_mod.asyncio, "sleep", _stop_after_tick)
+    await handler._video_sender_loop()
+
+    assert len(handler.session.realtime_inputs) == 1
+    blob = handler.session.realtime_inputs[0]["video"]
+    assert blob.data == b"jpeg-bytes"
+    assert blob.mime_type == "image/jpeg"
+
+
+@pytest.mark.asyncio
 async def test_emit_triggers_idle_through_shared_threshold(monkeypatch: pytest.MonkeyPatch) -> None:
     """Gemini drives idle behavior through the shared base emit and threshold, not the old 15s cadence."""
     movement_manager = MagicMock()

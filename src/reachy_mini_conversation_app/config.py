@@ -118,6 +118,12 @@ def _is_gemini_model_name(model_name: str | None) -> bool:
     return (model_name or "").strip().lower().startswith("gemini")
 
 
+# Backends shipped in earlier versions (v0.5–v0.8) that this fork no longer
+# provides. Stale robot .env files may still select them; warn and fall back to
+# the default backend rather than crashing at import.
+REMOVED_BACKEND_PROVIDERS: frozenset[str] = frozenset({"openai"})
+
+
 def _normalize_backend_provider(
     backend_provider: str | None = None,
     model_name: str | None = None,
@@ -126,6 +132,14 @@ def _normalize_backend_provider(
     candidate = (backend_provider or "").strip().lower()
     if candidate in DEFAULT_MODEL_NAME_BY_BACKEND:
         return candidate
+    if candidate in REMOVED_BACKEND_PROVIDERS:
+        logger.warning(
+            "BACKEND_PROVIDER=%r was removed in this fork; falling back to the %r backend. "
+            "Update or remove this setting (e.g. in your .env) to silence this warning.",
+            backend_provider,
+            DEFAULT_BACKEND_PROVIDER,
+        )
+        return DEFAULT_BACKEND_PROVIDER
     if candidate:
         expected = ", ".join(sorted(DEFAULT_MODEL_NAME_BY_BACKEND))
         raise ValueError(f"Invalid BACKEND_PROVIDER={backend_provider!r}. Expected one of: {expected}.")

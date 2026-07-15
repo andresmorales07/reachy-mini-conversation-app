@@ -79,9 +79,31 @@ def test_backend_provider_selects_gemini(monkeypatch: pytest.MonkeyPatch) -> Non
         config_mod.refresh_runtime_config_from_env()
 
 
-def test_unknown_backend_provider_raises(monkeypatch: pytest.MonkeyPatch) -> None:
-    """An unsupported BACKEND_PROVIDER is rejected rather than silently ignored."""
+def test_removed_backend_provider_falls_back_to_huggingface(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A removed-but-formerly-valid provider (openai) warns and falls back, not crashes.
+
+    Guards against a stale robot .env carrying BACKEND_PROVIDER=openai (valid in
+    v0.5-v0.8) hard-crashing the app at import.
+    """
     monkeypatch.setenv("BACKEND_PROVIDER", "openai")
+    monkeypatch.delenv("MODEL_NAME", raising=False)
+    try:
+        with caplog.at_level("WARNING"):
+            config_mod.refresh_runtime_config_from_env()
+
+        assert config_mod.config.BACKEND_PROVIDER == config_mod.HF_BACKEND
+        assert config_mod.is_gemini_model() is False
+        assert "openai" in caplog.text.lower()
+    finally:
+        monkeypatch.delenv("BACKEND_PROVIDER", raising=False)
+        config_mod.refresh_runtime_config_from_env()
+
+
+def test_unknown_backend_provider_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An unrecognized BACKEND_PROVIDER (e.g. a typo) is rejected rather than silently ignored."""
+    monkeypatch.setenv("BACKEND_PROVIDER", "huggingfacee")
     try:
         with pytest.raises(ValueError, match="Invalid BACKEND_PROVIDER"):
             config_mod.refresh_runtime_config_from_env()
